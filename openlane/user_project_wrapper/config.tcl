@@ -31,7 +31,7 @@ set ::env(DESIGN_NAME) user_project_wrapper
 #section end
 
 # User Configurations
-
+set ::env(SYNTH_READ_BLACKBOX_LIB) 1
 ## Source Verilog Files
 set ::env(VERILOG_FILES) "\
 	$::env(CARAVEL_ROOT)/verilog/rtl/defines.v \
@@ -50,20 +50,21 @@ set ::env(FP_PDN_MACRO_HOOKS) "\
 
 ### Macro Placement
 set ::env(MACRO_PLACEMENT_CFG) $script_dir/macro.cfg
+set ::env(LIB_SYNTH) "$::env(PDK_ROOT)/$::env(PDK)/libs.ref/$::env(STD_CELL_LIBRARY)/lib/sky130_fd_sc_hd__tt_100C_1v80.lib"
 
 ### Black-box verilog and views
 set ::env(VERILOG_FILES_BLACKBOX) "\
 	$::env(CARAVEL_ROOT)/verilog/rtl/defines.v \
-	$script_dir/../../verilog/rtl/user_proj_example.v"
+	$script_dir/../../verilog/rtl/azadi_soc_top_caravel.v"
 
 set ::env(EXTRA_LEFS) "\
-	$script_dir/../../lef/user_proj_example.lef"
+	$script_dir/../../lef/azadi_soc_top_caravel.lef"
 
 set ::env(EXTRA_GDS_FILES) "\
-	$script_dir/../../gds/user_proj_example.gds"
+	$script_dir/../../gds/azadi_soc_top_caravel.gds"
 
-# set ::env(GLB_RT_MAXLAYER) 5
-set ::env(RT_MAX_LAYER) {met4}
+#set ::env(GLB_RT_MAXLAYER) 5
+set ::env(RT_MAX_LAYER) {met5}
 
 # disable pdn check nodes becuase it hangs with multiple power domains.
 # any issue with pdn connections will be flagged with LVS so it is not a critical check.
@@ -72,7 +73,8 @@ set ::env(FP_PDN_CHECK_NODES) 0
 # The following is because there are no std cells in the example wrapper project.
 set ::env(SYNTH_TOP_LEVEL) 1
 set ::env(PL_RANDOM_GLB_PLACEMENT) 1
-
+set ::env(DESIGN_IS_CORE) "1"
+set ::env(FP_SIZING) "absolute"
 set ::env(PL_RESIZER_DESIGN_OPTIMIZATIONS) 0
 set ::env(PL_RESIZER_TIMING_OPTIMIZATIONS) 0
 set ::env(PL_RESIZER_BUFFER_INPUT_PORTS) 0
@@ -84,3 +86,7 @@ set ::env(DIODE_INSERTION_STRATEGY) 0
 set ::env(FILL_INSERTION) 0
 set ::env(TAP_DECAP_INSERTION) 0
 set ::env(CLOCK_TREE_SYNTH) 0
+
+
+
+
