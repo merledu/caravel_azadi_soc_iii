@@ -82,10 +82,16 @@ module user_project_wrapper #(
 /* User project is instantiated  here   */
 /*--------------------------------------*/
 
-user_proj_example mprj (
+azadi_soc_top_caravel mprj (
 `ifdef USE_POWER_PINS
+    .vdda1(vdda1),
+    .vdda2(vdda2),
+    .vssa1(vssa1),
+    .vssa2(vssa2),
 	.vccd1(vccd1),	// User area 1 1.8V power
+    .vccd2(vccd2),
 	.vssd1(vssd1),	// User area 1 digital ground
+    .vssd2(vssd2),
 `endif
 
     .wb_clk_i(wb_clk_i),
@@ -113,9 +119,14 @@ user_proj_example mprj (
     .io_in (io_in),
     .io_out(io_out),
     .io_oeb(io_oeb),
+     
+
+    .analog_io(analog_io),
+
+    .user_clock2(user_clock2),
 
     // IRQ
-    .irq(user_irq)
+    .user_irq(user_irq)
 );
 
 endmodule	// user_project_wrapper
