@@ -28,8 +28,6 @@ module azadi_soc_top_caravel (
       inout vccd2,	// User area 2 1.8v supply
       inout vssd1,	// User area 1 digital ground
       inout vssd2,	// User area 2 digital ground
-	inout VPWR,
-	inout VGND,
   `endif
 
     // Wishbone Slave ports (WB MI A)
@@ -50,15 +48,15 @@ module azadi_soc_top_caravel (
     input  [127:0] la_oenb,
 
     // IOs, MPRJ_IO_PADS = 38
-    input  [`MPRJ_IO_PADS-1:0] io_in,  
-    output [`MPRJ_IO_PADS-1:0] io_out,
-    output [`MPRJ_IO_PADS-1:0] io_oeb,
+    input  [`MPRJ_IO_PADS-2:0] io_in,  
+    output [`MPRJ_IO_PADS-2:0] io_out,
+    output [`MPRJ_IO_PADS-2:0] io_oeb,
 
     // Analog (direct connection to GPIO pad---use with caution)
     // Note that analog I/O is not available on the 7 lowest-numbered
     // GPIO pads, and so the analog_io indexing is offset from the
     // GPIO indexing by 7 (also upper 2 GPIOs do not have analog_io).
-    inout [`MPRJ_IO_PADS-10:0] analog_io,
+    inout [`MPRJ_IO_PADS-11:0] analog_io,
 
     // Independent clock (on independent integer divider)
     input   user_clock2,
@@ -182,9 +180,9 @@ module azadi_soc_top_caravel (
   assign gpio_i[26]     =  io_in[34];
 
   // GPIO 27-29
-  assign io_oeb[37:35]  = ~gpio_oe[29:27];
-  assign gpio_i[29:27]  =  io_in  [37:35];
-  assign io_out[37:35]  =  gpio_o [29:27];
+  assign io_oeb[36:35]  = ~gpio_oe[28:27];
+  assign gpio_i[28:27]  =  io_in  [36:35];
+  assign io_out[36:35]  =  gpio_o [28:27];
 
   // Logic Analyzer ports
   assign clks_per_bit  = la_data_in[15:0];
@@ -195,7 +193,7 @@ module azadi_soc_top_caravel (
     .VGND(vssd1),
   `endif
     .clk_i(wb_clk_i),
-    .rst_ni(wb_rst_i),
+    .rst_ni(~wb_rst_i),
     .prog(prog),
 
     // Clocks per bits
