@@ -20,8 +20,14 @@
 `define MPRJ_IO_PADS 38
 module azadi_soc_top_caravel (
   `ifdef USE_POWER_PINS
+      inout vdda1,	// User area 1 3.3V supply
+      inout vdda2,	// User area 2 3.3V supply
+      inout vssa1,	// User area 1 analog ground
+      inout vssa2,	// User area 2 analog ground
       inout vccd1,	// User area 1 1.8V supply
+      inout vccd2,	// User area 2 1.8v supply
       inout vssd1,	// User area 1 digital ground
+      inout vssd2,	// User area 2 digital ground
   `endif
 
     // Wishbone Slave ports (WB MI A)
@@ -46,29 +52,32 @@ module azadi_soc_top_caravel (
     output [`MPRJ_IO_PADS-2:0] io_out,
     output [`MPRJ_IO_PADS-2:0] io_oeb,
 
+    // Analog (direct connection to GPIO pad---use with caution)
+    // Note that analog I/O is not available on the 7 lowest-numbered
+    // GPIO pads, and so the analog_io indexing is offset from the
+    // GPIO indexing by 7 (also upper 2 GPIOs do not have analog_io).
+    inout [`MPRJ_IO_PADS-11:0] analog_io,
+
+    // Independent clock (on independent integer divider)
+    input   user_clock2,
+
     // User maskable interrupt signals
-    output [1:0] irq
+    output [2:0] user_irq
 );
 
   wire clk_i;  
   wire rst_ni; 
   wire prog;
+  wire led;
   
   // Clocks per bit
   wire [15:0] clks_per_bit;  
 
   // gpios interface
-  wire [31:0] gpio_i;
-  wire [31:0] gpio_o;
-  wire [31:0] gpio_oe;
+  wire [19:0] gpio_i;
+  wire [19:0] gpio_o;
+  wire [19:0] gpio_oe;
 
-  // jtag interface 
-  wire jtag_tck;   
-  wire jtag_tms;   
-  wire jtag_trst; 
-  wire jtag_tdi;   
-  wire jtag_tdo;   
-  wire jtag_tdo_oe;
 
   // uart-periph interface
   wire uart_tx;
@@ -81,105 +90,90 @@ module azadi_soc_top_caravel (
   wire pwm2_oe;
 
   // SPI interface
-  wire [3:0] ss_o;        
+  wire [1:0] ss_o;        
   wire       sclk_o;      
   wire       sd_o;
   wire       sd_oe;       
   wire       sd_i;
 
-  // Note: Output enable is active low for IO pads
-  assign io_oeb[0]    =  ~jtag_tdo_oe;
-  assign jtag_tdi     =   io_in[0];
-  assign io_out[0]    =   jtag_tdo;
+  wire       qsclk_o;
+  wire       qcs_o;
+  wire [3:0] qsd_i;
+  wire [3:0] qsd_o;
+  wire [3:0] qsd_oe;
 
-  // SPI 0
-  assign io_oeb[1]     = ~(sd_oe | gpio_oe[30]);
-  assign io_out[1]     =  sd_oe ? sd_o : gpio_o[30];
-  assign gpio_i[30]    =  io_in[1];
+// SPI pin mux
 
-  assign io_oeb[2]     =  1'b1;
-  assign io_out[2]     =  1'b0; 
-  assign sd_i          =  io_in[2];
+  assign io_out[0] = sclk_o;
+  assign io_oeb[0] = 1'b0;
+  assign io_out[1] = sd_o;
+  assign io_oeb[1] = ~sd_oe;
 
-  assign io_oeb[3]     = ~(sd_oe | gpio_oe[31]);
-  assign io_out[3]     =  sd_oe ? ss_o[0] : gpio_o[31];
-  assign gpio_i[31]    =  io_in[3];
+  assign sd_i      = io_in[2];
+  assign io_oeb[2] = 1'b1;
+  assign io_out[2] = 1'b0;
 
-  assign io_oeb[4]     =  1'b0;
-  assign io_out[4]     =  sclk_o;
+  assign io_out[3] = ss_o[0];
+  assign io_oeb[3] = 1'b0;
+  assign io_out[4] = ss_o[1];
+  assign io_oeb[4] = 1'b0;
 
-  // UART 
-  assign io_oeb[5]     =  1'b1;
-  assign io_out[2]     =  1'b0;
-  assign uart_rx       =  io_in[5];
+// UART pin mux
 
-  assign io_oeb[6]     =  1'b0;
-  assign io_out[6]     =  uart_tx;
-    
-  // Programming Button 
-  assign io_oeb[7]     =  1'b1;
-  assign io_out[2]     =  1'b0;
-  assign prog          =  io_in[7];
+  assign uart_rx   = io_in[5];
+  assign io_oeb[5] = 1'b1;
+  assign io_out[5] = 1'b0;
 
-  // GPIO 0-18
-  assign io_oeb[25:8]  = ~gpio_oe[17:0];
-  assign gpio_i[17:0]  =  io_in  [25:8];
-  assign io_out[25:8]  =  gpio_o [17:0];
-  assign gpio_i[18]    = 1'b0;
-  // GPIO 19-21, SPI SS
-  assign io_oeb[27]    = ~(sd_oe | gpio_oe[19]);
-  assign io_out[27]    =  sd_oe ?  ss_o[1] :  gpio_o [19];  // SPI slave sel[1]
-  assign gpio_i[19]    =  io_in[27];
+  assign io_out[6] = uart_tx;
+  assign io_oeb[6] = 1'b0;
 
-  assign io_oeb[28]    = ~(sd_oe | gpio_oe[20]);
-  assign io_out[28]    =  sd_oe ?  ss_o[2] :  gpio_o [20];  // SPI slave sel[2]
-  assign gpio_i[20]    =  io_in[28];
+// PROG button 
 
-  assign io_oeb[29]    = ~(sd_oe | gpio_oe[21]);
-  assign io_out[29]    =  sd_oe ?  ss_o[3] :  gpio_o [21];  // SPI slave sel[3]
-  assign gpio_i[21]    =  io_in[29];
+  assign prog      = io_in[7];
+  assign io_oeb[7] = 1'b1;
+  assign io_out[7] = 1'b0;
 
-  // GPIO 22-24, JTAG in
-  assign io_oeb[30]    =  ~gpio_oe[22];
-  assign io_out[30]    =   gpio_o [22];  
-  assign gpio_i[22]    =   io_in[30];
-  assign jtag_tck      =   io_in[30];  // JTAG TCK
+// PWM pin mux
 
-  assign io_oeb[31]    =  ~gpio_oe[23];
-  assign io_out[31]    =   gpio_o [23];  
-  assign gpio_i[23]    =   io_in[31];
-  assign jtag_tms      =   io_in[31];  // JTAG TMS
+  assign io_out[8] = pwm_o_1;
+  assign io_oeb[8] = ~pwm1_oe;
+  assign io_out[9] = pwm_o_2;
+  assign io_oeb[9] = ~pwm2_oe;
 
-  assign io_oeb[32]    =  ~gpio_oe[24];
-  assign io_out[32]    =   gpio_o [24];  
-  assign gpio_i[24]    =   io_in[32];
-  assign jtag_trst     =   io_in[32];  // JTAG TRST
-  
-  // GPIO 25-26, PWM 1, 2
-  assign io_oeb[33]     = ~(pwm1_oe | gpio_oe[25]);  // PWM1 
-  assign io_out[33]     =   pwm1_oe ?  pwm_o_1 : gpio_o [25];
-  assign gpio_i[25]     =   io_in[33];
+// GPIO pin mux 
 
-  assign io_oeb[34]     = ~(pwm2_oe | gpio_oe[26]);  // PWM2 
-  assign io_out[34]     =  pwm2_oe  ?  pwm_o_2 :  gpio_o [26];
-  assign gpio_i[26]     =  io_in[34];
+  assign io_out[29:10] = gpio_o;
+  assign gpio_i        = io_in[29:10];
+  assign io_oeb[29:10] = ~gpio_oe;
 
-  // GPIO 27-29
-  assign io_oeb[36:35]  = ~gpio_oe[28:27];
-  assign gpio_i[28:27]  =  io_in  [36:35];
-  assign io_out[36:35]  =  gpio_o [28:27];
+// BOOT LED pin
+
+  assign io_out[30] = led;
+  assign io_oeb[30] = 1'b0;
+// QSPI pin mux
+
+  assign io_out[31] = qcs_o;
+  assign io_oeb[31] = 1'b0;
+
+  assign io_out[32] = qsclk_o;
+  assign io_oeb[32] = 1'b0;
+
+  assign io_out[36:33] = qsd_o;
+  assign qsd_i         = io_in[36:33];
+  assign io_oeb[36:33] = ~qsd_oe;
 
   // Logic Analyzer ports
   assign clks_per_bit  = la_data_in[15:0];
 
   azadi_soc_top soc_top(
   `ifdef USE_POWER_PINS
-    .VPWR(vccd1),
-    .VGND(vssd1),
+    .vccd1(vccd1),
+    .vssd1(vssd1),
   `endif
     .clk_i(wb_clk_i),
     .rst_ni(~wb_rst_i),
     .prog(prog),
+    .boot_led(led),
 
     // Clocks per bits
     .clks_per_bit(clks_per_bit), 
@@ -188,14 +182,6 @@ module azadi_soc_top_caravel (
     .gpio_i(gpio_i),
     .gpio_o(gpio_o),
     .gpio_oe(gpio_oe),
-
-    // jtag interface 
-   /* .jtag_tck_i(jtag_tck),
-    .jtag_tms_i(jtag_tms),
-    .jtag_trst_ni(jtag_trst),
-    .jtag_tdi_i(jtag_tdi),
-    .jtag_tdo_o(jtag_tdo),
-    .jtag_tdo_oe_o(jtag_tdo_oe),*/
 
     // uart-periph interface
     .uart_tx(uart_tx), // output
@@ -212,7 +198,15 @@ module azadi_soc_top_caravel (
     .sclk_o(sclk_o),      
     .sd_o(sd_o),
     .sd_oe(sd_oe),       
-    .sd_i(sd_i)
+    .sd_i(sd_i),
+
+// qspi interface
+
+    .qsclk_o (qsclk_o),
+    .qcs_o   (qcs_o),
+    .qsd_i   (qsd_i),
+    .qsd_o   (qsd_o),
+    .qsd_oe  (qsd_oe)
   );
 
 endmodule
